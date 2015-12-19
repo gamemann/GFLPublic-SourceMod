@@ -1,3 +1,6 @@
+# Warning
+* This plugin pack was developed for GFL. Anybody can use/edit these plugins. However, do not expect any support until this warning is removed.
+
 # To-Do-List
 * Finish GFL-Badges and GFL-SelfMute.
 * Organize/optimize code.
