@@ -16,6 +16,7 @@ new Handle:g_hOnLoad;
 new Handle:g_hLogging = INVALID_HANDLE;
 new Handle:g_hLoggingPath = INVALID_HANDLE;
 new Handle:g_hLogPrint = INVALID_HANDLE;
+new Handle:g_hAdFlag = INVALID_HANDLE;
 
 new Handle:g_hHostName = INVALID_HANDLE;
 
@@ -23,6 +24,7 @@ new Handle:g_hHostName = INVALID_HANDLE;
 new bool:g_bLogging;
 new String:g_sLoggingPath[PLATFORM_MAX_PATH];
 new bool:g_bLogPrint;
+new String:g_sAdFlag[32];
 
 new String:g_sHostName[MAX_NAME_LENGTH];
 
@@ -97,7 +99,10 @@ stock ForwardConVars()
 	HookConVarChange(g_hLoggingPath, CVarChanged);	
 	
 	g_hLogPrint = CreateConVar("GFLCore_LogPrint", "1", "If 1, all GFLCore_LogMessage() messages will also be printed to the server console.");
-	HookConVarChange(g_hLogPrint, CVarChanged);
+	HookConVarChange(g_hLogPrint, CVarChanged);	
+	
+	g_hAdFlag = CreateConVar("GFLCore_Ad_Flag", "a", "The flag required to disable advertisements.");
+	HookConVarChange(g_hAdFlag, CVarChanged);
 	
 	g_hHostName = FindConVar("hostname");
 	HookConVarChange(g_hHostName, CVarChanged);
@@ -208,6 +213,7 @@ stock ForwardValues()
 	GetConVarString(g_hLoggingPath, g_sLoggingPath, sizeof(g_sLoggingPath));
 	GetConVarString(g_hHostName, g_sHostName, sizeof(g_sHostName));
 	g_bLogPrint = GetConVarBool(g_hLogPrint);
+	GetConVarString(g_hAdFlag, g_sAdFlag, sizeof(g_sAdFlag));
 	
 	if (g_bLogging)
 	{
@@ -227,7 +233,7 @@ public Action:Command_DisableAds(iClient, iArgs)
 		return Plugin_Handled;
 	}
 	
-	if (!HasPermission(iClient, "a"))
+	if (!HasPermission(iClient, g_sAdFlag))
 	{
 		ReplyToCommand(iClient, "\x03[GFL-Core]\x02You can only disable advertisements as Supporter+. Donate @ GFLClan.com!");
 	}
