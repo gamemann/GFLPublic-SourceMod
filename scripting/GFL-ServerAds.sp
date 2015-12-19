@@ -34,11 +34,15 @@ new Handle:g_hOnErrorCountReached;
 new Handle:g_hAdInterval = INVALID_HANDLE;
 new Handle:g_hCustomAdsFile = INVALID_HANDLE;
 new Handle:g_hEnableErrorReachLimit;
+new Handle:g_hGlobalTableName = INVALID_HANDLE;
+new Handle:g_hPaidTableName = INVALID_HANDLE;
 
 // ConVar Values
 new Float:g_fAdInterval;
 new String:g_sCustomAdsFile[PLATFORM_MAX_PATH];
 new bool:g_bEnableErrorReachLimit;
+new String:g_sGlobalTableName[MAX_NAME_LENGTH];
+new String:g_sPaidTableName[MAX_NAME_LENGTH];
 
 // Other
 new Handle:g_hDB = INVALID_HANDLE;
@@ -117,7 +121,13 @@ stock ForwardConVars()
 	HookConVarChange(g_hCustomAdsFile, CVarChanged);	
 	
 	g_hEnableErrorReachLimit = CreateConVar("sm_gflsa_enable_error_reach_limit", "1", "If 1, will retry the database if the MySQL error count is reached.");
-	HookConVarChange(g_hEnableErrorReachLimit, CVarChanged);
+	HookConVarChange(g_hEnableErrorReachLimit, CVarChanged);	
+	
+	g_hGlobalTableName = CreateConVar("sm_gflsa_global_tablename", "gfl_adverts-default", "The table name of the global advertisements.");
+	HookConVarChange(g_hGlobalTableName, CVarChanged);	
+	
+	g_hPaidTableName = CreateConVar("sm_gflsa_paid_tablename", "gfl_adverts-paid", "The table name of the paid advertisements.");
+	HookConVarChange(g_hPaidTableName, CVarChanged);
 	
 	AutoExecConfig(true, "GFL-ServerAds");
 }
@@ -143,6 +153,8 @@ stock ForwardValues()
 	g_fAdInterval = GetConVarFloat(g_hAdInterval);
 	GetConVarString(g_hCustomAdsFile, g_sCustomAdsFile, sizeof(g_sCustomAdsFile));
 	g_bEnableErrorReachLimit = GetConVarBool(g_hEnableErrorReachLimit);
+	GetConVarString(g_hGlobalTableName, g_sGlobalTableName, sizeof(g_sGlobalTableName));
+	GetConVarString(g_hPaidTableName, g_sPaidTableName, sizeof(g_sPaidTableName));
 }
 
 public GFLMySQL_OnDatabaseConnected(Handle:hDB)
@@ -223,12 +235,12 @@ public UpdateAdverts()
 	
 	// Default Advertisements.
 	decl String:sQuery[256];
-	Format(sQuery, sizeof(sQuery), "SELECT * FROM `gfl_adverts-default`");
+	Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s`", g_sGlobalTableName);
 	SQL_TQuery(g_hDB, AdvertsDefaultCallback, sQuery, _, DBPrio_High);
 	
 	// Paid Advertisements.
 	decl String:sQuery2[256];
-	Format(sQuery2, sizeof(sQuery2), "SELECT * FROM `gfl_adverts-paid` WHERE `activated`=1");
+	Format(sQuery2, sizeof(sQuery2), "SELECT * FROM `%s` WHERE `activated`=1", g_sPaidTableName);
 	SQL_TQuery(g_hDB, AdvertsPaidCallback, sQuery2, _, DBPrio_High);
 	
 	// Custom Advertisements
