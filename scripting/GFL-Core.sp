@@ -92,16 +92,16 @@ stock ForwardConVars()
 {
 	CreateConVar("GFLCore_version", PL_VERSION, "GFL's Core version.");
 	
-	g_hLogging = CreateConVar("sm_GFLCore_Logging", "1", "Enable logging for GFL's plugins?");
+	g_hLogging = CreateConVar("sm_gflcore_Logging", "1", "Enable logging for GFL's plugins?");
 	HookConVarChange(g_hLogging, CVarChanged);
 	
-	g_hLoggingPath = CreateConVar("sm_GFLCore_LoggingPath", "logs/GFL/", "The path starting from SourceMod/ that the logs will be entered in.");
+	g_hLoggingPath = CreateConVar("sm_gflcore_LoggingPath", "logs/GFL/", "The path starting from SourceMod/ that the logs will be entered in.");
 	HookConVarChange(g_hLoggingPath, CVarChanged);	
 	
-	g_hLogPrint = CreateConVar("sm_GFLCore_LogPrint", "1", "If 1, all GFLCore_LogMessage() messages will also be printed to the server console.");
+	g_hLogPrint = CreateConVar("sm_gflcore_LogPrint", "1", "If 1, all GFLCore_LogMessage() messages will also be printed to the server console.");
 	HookConVarChange(g_hLogPrint, CVarChanged);	
 	
-	g_hAdFlag = CreateConVar("sm_GFLCore_Ad_Flag", "a", "The flag required to disable advertisements.");
+	g_hAdFlag = CreateConVar("sm_gflcore_Ad_Flag", "a", "The flag required to disable advertisements.");
 	HookConVarChange(g_hAdFlag, CVarChanged);
 	
 	g_hHostName = FindConVar("hostname");
