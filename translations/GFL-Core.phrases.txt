@@ -1,0 +1,26 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"en"	"{red}[GFL-Core]"
+	}
+	
+	// When somebody attempts to disable advertisements but doesn't have permission to.
+	"AdsDenyMessage"
+	{
+		"en"	"{default}You can only disable advertisements as {lightgreen}Supporter+{default}. Donate @ {lightgreen}GFLClan.com{default}!"
+	}
+	
+	// When somebody successfully enables advertisements again.
+	"AdsEnabled"
+	{
+		"en"	"{default}Server advertisements enabled!"
+	}	
+	
+	// When somebody successfully disables advertisements.
+	"AdsDisabled"
+	{
+		"en"	"{default}Server advertisements disabled!"
+	}
+}

@@ -1,0 +1,32 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"en"	"{darkred}[GFL-MySQL]"
+	}
+	
+	// When the plugin is disabled.
+	"PluginDisabled"
+	{
+		"en"	"{default}Plugin disabled. Please try again later."
+	}
+	
+	// Checking database reply.
+	"CheckingDatabase"
+	{
+		"en"	"{default}Checking database now..."
+	}	
+	
+	// Check (connection): Okay
+	"CheckOkay"
+	{
+		"en"	"{default}Connection is okay..."
+	}	
+	
+	// Checking database reply.
+	"CheckFailed"
+	{
+		"en"	"{default}Connection failed..."
+	}
+}

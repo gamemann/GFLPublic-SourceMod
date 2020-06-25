@@ -1,0 +1,40 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"en"			"{lightgreen}[Tokens] "
+	}
+	
+	// Plugin disabled.
+	"PluginDisabled"
+	{
+		"en"			"{default}Plugin disabled. Please try again later."
+	}
+	
+	// Called when an admin request the account ID.
+	"GetAccountID"
+	{
+		// 1: Account ID.
+		"#format"		"{1:d}"
+		"en"			"{default}Server's Account ID is {lightgreen}{1}{default}."
+	}
+	
+	// Called when an admin manually wants to check the token.
+	"CheckingToken"
+	{
+		"en"			"{default}Checking the token now! Please read the {lightgreen}logs{default}!"
+	}
+	
+	// Called when an admin manually checks if SteamWorks is enabled or not (enabled).
+	"SteamWorksEnabled"
+	{
+		"en"			"{default}SteamWorks is {lightgreen}enabled{default}."
+	}	
+	
+	// Called when an admin manually checks if SteamWorks is enabled or not (disabled).
+	"SteamWorksDisabled"
+	{
+		"en"			"{default}SteamWorks is {lightred}disabled{default}."
+	}
+}

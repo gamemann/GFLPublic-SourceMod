@@ -1,0 +1,22 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"TrackerTag"
+	{
+		"en"		"{red}[GFL]"
+	}
+	
+	// Reloaded user.
+	"ReloadedUser"
+	{
+		"#format"	"{1:N},{2:s}"
+		
+		"en"		"{default}Successfully reloaded {lightgreen}{1}{default} ({lightred}{2}{default})."
+	}	
+	
+	// Reloaded all users.
+	"ReloadedAllUsers"
+	{		
+		"en"		"{lightgreen}Successfully {default}reloaded all users!"
+	}
+}

@@ -1,43 +1,38 @@
 #include <sourcemod>
 #include <sdktools>
 #include <GFL-Core>
+#include <clientprefs>
+#include <multicolors>
+
 #undef REQUIRE_PLUGIN
 #include <updater>
-#include <clientprefs>
 
-//#define DEVELOPDEBUG
-#define UPDATE_URL "http://updater.gflclan.com/core.txt"
+#define UPDATE_URL "http://updater.gflclan.com/GFL-Core.txt"
+#define PL_VERSION "1.0.1"
 
 // Forwars
-new Handle:g_hOnUnload;
-new Handle:g_hOnLoad;
+Handle g_hOnUnload;
+Handle g_hOnLoad;
 
 // ConVars
-new Handle:g_hLogging = INVALID_HANDLE;
-new Handle:g_hLoggingPath = INVALID_HANDLE;
-new Handle:g_hLogPrint = INVALID_HANDLE;
-new Handle:g_hAdFlag = INVALID_HANDLE;
-
-new Handle:g_hHostName = INVALID_HANDLE;
+ConVar g_hLogging = null;
+ConVar g_hLoggingPath = null;
+ConVar g_hLogPrint = null;
+ConVar g_hAdFlag = null;
 
 // ConVar Values
-new bool:g_bLogging;
-new String:g_sLoggingPath[PLATFORM_MAX_PATH];
-new bool:g_bLogPrint;
-new String:g_sAdFlag[32];
-
-new String:g_sHostName[MAX_NAME_LENGTH];
+bool g_bLogging;
+char g_sLoggingPath[PLATFORM_MAX_PATH];
+bool g_bLogPrint;
+char g_sAdFlag[32];
 
 // Other Values
-new bool:g_bBadHostName = false;
-new bool:g_bFirstHostNameCheck = true;
-new Handle:g_hClientCookie;
-new bool:g_bAdsDisabled[256];
+Handle g_hClientCookie;
+bool g_bAdsDisabled[MAXPLAYERS + 1];
 
-public APLRes:AskPluginLoad2(Handle:hMyself, bool:bLate, String:sErr[], iErrMax) 
+public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sErr, int iErrMax) 
 {
 	CreateNative("GFLCore_LogMessage", Native_GFLCore_LogMessage);
-	CreateNative("GFLCore_CloseHandle", Native_GFLCore_CloseHandle);
 	CreateNative("GFLCore_ClientAds", Native_GFLCore_ClientAds);
 	
 	RegPluginLibrary("GFL-Core");
@@ -45,7 +40,7 @@ public APLRes:AskPluginLoad2(Handle:hMyself, bool:bLate, String:sErr[], iErrMax)
 	return APLRes_Success;
 }
 
-public OnLibraryAdded(const String:sLName[]) 
+public void OnLibraryAdded(const char[] sLName) 
 {
 	if (StrEqual(sLName, "updater"))
 	{
@@ -53,16 +48,16 @@ public OnLibraryAdded(const String:sLName[])
 	}
 }
 
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
 	name = "GFL-Core",
+	author = "Christian Deacon (Roy) and Ariistuujj",
 	description = "GFL's plugin core.",
-	author = "Roy (Christian Deacon)",
 	version = PL_VERSION,
 	url = "GFLClan.com & TheDevelopingCommunity.com"
 };
 
-public OnPluginStart() 
+public void OnPluginStart() 
 {
 	Forwards();
 	ForwardConVars();
@@ -71,7 +66,10 @@ public OnPluginStart()
 	// Cookies
 	g_hClientCookie = RegClientCookie("GFL-DisableAds", "Disables GFL Advertisements and Server Hop Ads", CookieAccess_Protected);
 	
-	for (new i = 1; i <= MaxClients; i++)
+	// Translations
+	LoadTranslations("GFL-Core.phrases.txt");
+	
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!AreClientCookiesCached(i))
 		{
@@ -82,16 +80,14 @@ public OnPluginStart()
 	}
 }
 
-stock Forwards()
+stock void Forwards()
 {
 	g_hOnUnload = CreateGlobalForward("GFLCore_OnUnload", ET_Event);
 	g_hOnLoad = CreateGlobalForward("GFLCore_OnLoad", ET_Event);
 }
 
-stock ForwardConVars() 
+stock void ForwardConVars() 
 {
-	CreateConVar("GFLCore_version", PL_VERSION, "GFL's Core version.");
-	
 	g_hLogging = CreateConVar("sm_gflcore_Logging", "1", "Enable logging for GFL's plugins?");
 	HookConVarChange(g_hLogging, CVarChanged);
 	
@@ -102,116 +98,55 @@ stock ForwardConVars()
 	HookConVarChange(g_hLogPrint, CVarChanged);	
 	
 	g_hAdFlag = CreateConVar("sm_gflcore_Ad_Flag", "a", "The flag required to disable advertisements.");
-	HookConVarChange(g_hAdFlag, CVarChanged);
-	
-	g_hHostName = FindConVar("hostname");
-	HookConVarChange(g_hHostName, CVarChanged);
+	HookConVarChange(g_hAdFlag, CVarChanged);	
 	
 	AutoExecConfig(true, "GFL-Core");
 }
 
-stock ForwardCommands() 
+stock void ForwardCommands() 
 {
-	RegConsoleCmd("sm_GFLCore_version", Command_ReturnVersion);
 	RegConsoleCmd("sm_disableads", Command_DisableAds);
 }
 
-public OnClientCookiesCached(iClient)
+public void OnClientCookiesCached(int iClient)
 {
-	decl String:sValue[11];
+	char sValue[11];
 	GetClientCookie(iClient, g_hClientCookie, sValue, sizeof(sValue));
 	
 	if (StringToInt(sValue) == 0)
 	{
-		g_bAdsDisabled[GetClientSerial(iClient)] = false;
+		g_bAdsDisabled[iClient] = false;
 	}
 	else if (StringToInt(sValue) == 1)
 	{
-		g_bAdsDisabled[GetClientSerial(iClient)] = true;
+		g_bAdsDisabled[iClient] = true;
 	}
 }
 
-public OnMapStart()
-{
-	CreateTimer(5.0, RecheckHostName);
-}
-
-public OnPluginEnd()
+public void OnPluginEnd()
 {
 	Call_StartForward(g_hOnUnload);
 	Call_Finish();
 }
 
-public CVarChanged(Handle:hCVar, const String:sOldV[], const String:sNewV[])
-{
-	ForwardValues();
-	
-	if (hCVar == g_hHostName)
-	{
-		if (!g_bFirstHostNameCheck)
-		{
-			CheckHostName();
-		}
-	}
-}
-
-stock CheckHostName()
-{
-	decl String:sHostName[MAX_NAME_LENGTH];
-	GetConVarString(g_hHostName, sHostName, sizeof(sHostName));
-	
-	#if defined DEVELOPDEBUG then
-		PrintToServer("[GFL-Core]Checking Host Name (%s)...", sHostName);
-	#endif
-	
-	if (StrContains(sHostName, "gflclan.com", false) == -1)
-	{
-		#if defined DEVELOPDEBUG then
-			PrintToServer("[GFL-Core]Host Name does not contain GFLClan.com...");
-		#endif
-		g_bBadHostName = true;
-		Call_StartForward(g_hOnUnload);
-		Call_Finish();
-		
-		GFLCore_LogMessage("", "[GFL-Core] CheckHostName() :: Host Name Changed :: Does not contain GFLClan.com. All child plugins unloaded.");
-	}
-	else
-	{
-		#if defined DEVELOPDEBUG then
-			PrintToServer("[GFL-Core]Host Name does contain GFLClan.com...");
-		#endif
-		
-		if (g_bBadHostName || g_bFirstHostNameCheck)
-		{
-			#if defined DEVELOPDEBUG then
-				PrintToServer("[GFL-Core]g_bBadHostName set to true and loading all child plugins...");
-			#endif
-			g_bBadHostName = false;
-			Call_StartForward(g_hOnLoad);
-			Call_Finish();
-			
-			GFLCore_LogMessage("", "[GFL-Core] CheckHostName() :: Host Name Changed :: Does contain GFLClan.com. All child plugins weren't loaded. Loading all child plugins now.");
-		}
-	}
-	
-	g_bFirstHostNameCheck = false;
-}
-
-public Action:RecheckHostName(Handle:hTimer)
-{
-	CheckHostName();
-}
-
-public OnConfigsExecuted() 
+public void CVarChanged(Handle hCVar, const char[] sOldV, const char[] sNewV)
 {
 	ForwardValues();
 }
 
-stock ForwardValues() 
+public void OnConfigsExecuted() 
+{
+	ForwardValues();
+	
+	/* Call the OnLoad forward. */
+	Call_StartForward(g_hOnLoad);
+	Call_Finish();
+}
+
+stock void ForwardValues() 
 {
 	g_bLogging = GetConVarBool(g_hLogging);
 	GetConVarString(g_hLoggingPath, g_sLoggingPath, sizeof(g_sLoggingPath));
-	GetConVarString(g_hHostName, g_sHostName, sizeof(g_sHostName));
 	g_bLogPrint = GetConVarBool(g_hLogPrint);
 	GetConVarString(g_hAdFlag, g_sAdFlag, sizeof(g_sAdFlag));
 	
@@ -221,36 +156,31 @@ stock ForwardValues()
 	}
 }
 
-public Action:Command_ReturnVersion(iClient, iArgs) 
-{	
-	return Plugin_Handled;
-}
-
-public Action:Command_DisableAds(iClient, iArgs)
+public Action Command_DisableAds(int iClient, int iArgs)
 {
-	if (g_bBadHostName || !IsClientInGame(iClient))
+	if (!IsClientInGame(iClient))
 	{
 		return Plugin_Handled;
 	}
 	
 	if (!HasPermission(iClient, g_sAdFlag))
 	{
-		ReplyToCommand(iClient, "\x03[GFL-Core]\x02You can only disable advertisements as Supporter+. Donate @ GFLClan.com!");
+		CReplyToCommand(iClient, "%t%t", "Tag", "AdsDenyMessage");
 	}
 	
-	if (g_bAdsDisabled[GetClientSerial(iClient)])
+	if (g_bAdsDisabled[iClient])
 	{
 		SetClientCookie(iClient, g_hClientCookie, "0");
-		g_bAdsDisabled[GetClientSerial(iClient)] = false;
+		g_bAdsDisabled[iClient] = false;
 		
-		ReplyToCommand(iClient, "\x03[GFL-Core]\x02Server advertisements enabled!");
+		CReplyToCommand(iClient, "%t%t", "Tag", "AdsEnabled");
 	}
 	else
 	{
 		SetClientCookie(iClient, g_hClientCookie, "1");
-		g_bAdsDisabled[GetClientSerial(iClient)] = true;
+		g_bAdsDisabled[iClient] = true;
 		
-		ReplyToCommand(iClient, "\x03[GFL-Core]\x02Server advertisements disabled!");
+		CReplyToCommand(iClient, "%t%t", "Tag", "AdsDisabled");
 	}
 	
 	return Plugin_Handled;
@@ -258,20 +188,20 @@ public Action:Command_DisableAds(iClient, iArgs)
 }
 
 /* NATIVES */
-public Native_GFLCore_LogMessage(Handle:hPlugin, iNumParmas) 
+public int Native_GFLCore_LogMessage(Handle hPlugin, int iNumParmas) 
 {
 	if (g_bLogging) 
 	{
-		decl String:sMsg[1024], String:sFileName[PLATFORM_MAX_PATH], String:sDate[MAX_NAME_LENGTH];
+		char sMsg[4096], sFileName[PLATFORM_MAX_PATH], sDate[MAX_NAME_LENGTH];
 		GetNativeString(1, sFileName, sizeof(sFileName));
 		GetNativeString(2, sMsg, sizeof(sMsg));
 		
-		decl String:sFormattedMsg[1024];
+		char sFormattedMsg[4096];
 		FormatNativeString(0, 0, 3, sizeof(sFormattedMsg), _, sFormattedMsg, sMsg);
 		
 		FormatTime(sDate, sizeof(sDate), "%m-%d-%y", GetTime());
 		
-		decl String:sFile[PLATFORM_MAX_PATH];
+		char sFile[PLATFORM_MAX_PATH];
 		
 		if (strlen(sFileName) > 0) 
 		{
@@ -282,13 +212,13 @@ public Native_GFLCore_LogMessage(Handle:hPlugin, iNumParmas)
 			Format(sFile, sizeof(sFile), "%s.log", sDate);
 		}
 		
-		decl String:sPath[PLATFORM_MAX_PATH];
+		char sPath[PLATFORM_MAX_PATH];
 		BuildPath(Path_SM, sPath, sizeof(sPath), "%s%s", g_sLoggingPath, sFile);
-		new Handle:hFile = OpenFile(sPath, "a");
+		Handle hFile = OpenFile(sPath, "a");
 		
-		if (hFile != INVALID_HANDLE) 
+		if (hFile != null) 
 		{
-			decl String:sFullMsg[256], String:sFullDate[256];
+			char sFullMsg[4096], sFullDate[256];
 			FormatTime(sFullDate, sizeof(sFullDate), "%c", GetTime());
 			Format(sFullMsg, sizeof(sFullMsg), "%s [GFL-Core] %s", sFullDate, sFormattedMsg);
 			
@@ -303,7 +233,7 @@ public Native_GFLCore_LogMessage(Handle:hPlugin, iNumParmas)
 				return false;
 			}
 			
-			GFLCore_CloseHandle(hFile);
+			delete hFile;
 		} 
 		else 
 		{
@@ -315,21 +245,13 @@ public Native_GFLCore_LogMessage(Handle:hPlugin, iNumParmas)
 	return true;
 }
 
-public Native_GFLCore_CloseHandle(Handle:hPlugin, iNumParmas) 
+public int Native_GFLCore_ClientAds(Handle hPlugin, int iNumParmas)
 {
-	new Handle:hHndl = Handle:GetNativeCellRef(1);
-	SetNativeCellRef(1, 0);
-	
-	return CloseHandle(hHndl);
-}
-
-public Native_GFLCore_ClientAds(Handle:hPlugin, iNumParmas)
-{
-	new iClient = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
 	if (IsClientInGame(iClient))
 	{
-		if (HasPermission(iClient, "a") && g_bAdsDisabled[GetClientSerial(iClient)])
+		if (HasPermission(iClient, "a") && g_bAdsDisabled[iClient])
 		{
 			return false;
 		}
@@ -345,35 +267,24 @@ public Native_GFLCore_ClientAds(Handle:hPlugin, iNumParmas)
 }
 
 // Just a quick function.
-stock bool:HasPermission(iClient, const String:flagString[]) 
+stock bool HasPermission(int iClient, char[] sFlagString) 
 {
-	if (StrEqual(flagString, "")) 
-	{
+	if (StrEqual(sFlagString, ""))
+	{	
 		return true;
 	}
 	
-	new AdminId:admin = GetUserAdmin(iClient);
+	AdminId eAdmin = GetUserAdmin(iClient);
 	
-	if (admin != INVALID_ADMIN_ID)
+	if (eAdmin != INVALID_ADMIN_ID)
 	{
-		new count, found, flags = ReadFlagString(flagString);
-		for (new i = 0; i <= 20; i++) 
-		{
-			if (flags & (1<<i)) 
-			{
-				count++;
-				
-				if (GetAdminFlag(admin, AdminFlag:i)) 
-				{
-					found++;
-				}
-			}
-		}
+		int iFlags = ReadFlagString(sFlagString);
 
-		if (count == found) {
+		if (CheckAccess(eAdmin, "", iFlags, true))
+		{
 			return true;
 		}
 	}
 
 	return false;
-} 
+}

@@ -12,10 +12,3 @@ forward GFLSA_OnDefaultAd();
 	*@return			Nothing.
 */
 forward GFLSA_OnPaidAd();
-
-/*
-	* Called when the MySQL reaches the maximum errors.
-	*
-	*@return			Nothing.
-*/
-forward GFLSA_OnErrorCountReached();

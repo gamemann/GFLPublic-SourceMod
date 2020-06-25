@@ -3,7 +3,7 @@
 // 		"chat-type"	- 1 = Prints To Chat, 2 = Prints To Center Text, 3 = Prints To Hint Text.
 //		"message" - The message of the the advert.
 // Color support: Uses multicolors (CS:GO is limited): https://forums.alliedmods.net/showthread.php?t=247770
-// Message example using multicolors: {darkred}[AD]{default}Hello everybody, my name is tommy! Register @ {lightgreen}GFLClan.com{default}!
+// Message example using multicolors: {lightgreen}[AD]{default}Hello everybody, my name is tommy! Register @ {lightgreen}GFLClan.com{default}!
 "CustomAdverts"
 {
 	//"1"

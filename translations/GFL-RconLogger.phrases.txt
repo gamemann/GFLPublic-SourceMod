@@ -1,0 +1,14 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"en"	"{darkred}[RLogger]"
+	}
+	
+	// Plugin disabled.
+	"PluginDisabled"
+	{
+		"en"	"{default}Plugin disabled. Please try again later."
+	}
+}

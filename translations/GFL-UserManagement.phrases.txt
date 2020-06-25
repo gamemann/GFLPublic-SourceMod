@@ -1,0 +1,19 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"UserManagementTag"
+	{
+		"en"		"{red}[GFL]"
+	}
+	
+	"PerksLoaded"
+	{
+		"#format"	"{1:s}"
+		"en"		"{default}Your {lightgreen}{1} {default}perks have been loaded!"
+	}
+	
+	"ReloadUsersReply"
+	{
+		"en"		"{lightgreen} Reloading {default} all users."
+	}
+}

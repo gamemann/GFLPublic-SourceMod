@@ -4,13 +4,15 @@
 #include <GFL-Core>
 #include <GFL-MySQL>
 #include <GFL-ServerAds>
+
 #undef REQUIRE_PLUGIN
 #include <updater>
 
-//#define DEVELOPDEBUG
 #define MAXADS 128
-#define UPDATE_URL "http://updater.gflclan.com/core.txt"
+#define UPDATE_URL "http://updater.gflclan.com/GFL-ServerAds.txt"
+#define PL_VERSION "1.0.1"
 
+// ENUM's aren't supported with the new syntax. Therefore, we need to stay on the old syntax until the SourceMod Developers find a better method.
 enum ServerAds
 {
 	iID,
@@ -23,209 +25,290 @@ enum ServerAds
 	iChatType
 }
 
-new g_arrServerAds[MAXADS][ServerAds];
+int g_arrServerAds[MAXADS][ServerAds];
 
 // Forwards
-new Handle:g_hOnDefaultAd;
-new Handle:g_hOnPaidAd;
-new Handle:g_hOnErrorCountReached;
+Handle g_hOnDefaultAd;
+Handle g_hOnPaidAd;
 
 // ConVars
-new Handle:g_hAdInterval = INVALID_HANDLE;
-new Handle:g_hCustomAdsFile = INVALID_HANDLE;
-new Handle:g_hEnableErrorReachLimit;
-new Handle:g_hGlobalTableName = INVALID_HANDLE;
-new Handle:g_hPaidTableName = INVALID_HANDLE;
+ConVar g_hAdInterval = null;
+ConVar g_hCustomAdsFile = null;
+ConVar g_hGlobalTableName = null;
+ConVar g_hPaidTableName = null;
+ConVar g_hGameID = null;
+ConVar g_hDBPriority = null;
+ConVar g_hAdvanceDebug = null;
+ConVar g_hCreateDBTable = null;
 
 // ConVar Values
-new Float:g_fAdInterval;
-new String:g_sCustomAdsFile[PLATFORM_MAX_PATH];
-new bool:g_bEnableErrorReachLimit;
-new String:g_sGlobalTableName[MAX_NAME_LENGTH];
-new String:g_sPaidTableName[MAX_NAME_LENGTH];
+float g_fAdInterval;
+char g_sCustomAdsFile[PLATFORM_MAX_PATH];
+char g_sGlobalTableName[MAX_NAME_LENGTH];
+char g_sPaidTableName[MAX_NAME_LENGTH];
+int g_iGameID;
+int g_iDBPriority;
+bool g_bAdvanceDebug;
+bool g_bCreateDBTable;
 
 // Other
-new Handle:g_hDB = INVALID_HANDLE;
-new bool:g_bEnabled = false;
-new bool:g_bCoreEnabled = false;
-new bool:g_bServerHop = false;
-new g_iCurAd = 0;
-new g_iAdCount = 0;
-new g_iSQLErrorCount = 0;
+Handle g_hDB = null;
+bool g_bEnabled = false;
+int g_iCurAd = 0;
+int g_iAdCount = 0;
+Handle g_hAdvertTimer = null;
+bool g_bCVarsLoaded = false;
 
-public APLRes:AskPluginLoad2(Handle:hMyself, bool:bLate, String:sErr[], iErrMax) 
+DBPriority dbPriority = DBPrio_Low;
+
+public APLRes AskPluginLoad2(Handle hMyself, bool bLate, char[] sErr, int iErrMax) 
 {
 	RegPluginLibrary("GFL-ServerAds");
 	
 	return APLRes_Success;
 }
 
-public OnLibraryAdded(const String:sLName[]) 
+public void OnLibraryAdded(const char[] sLName) 
 {
-	if (StrEqual(sLName, "GFL-MySQL"))
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] OnLibraryAdded() :: GFL MySQL library found.");
-		#endif
-	}
-	
-	if (StrEqual(sLName, "GFL-ServerHop"))
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] OnLibraryAdded() :: GFL Server Hop library found.");
-		#endif
-		g_bServerHop = true;
-	}
-	
 	if (StrEqual(sLName, "updater"))
 	{
 		Updater_AddPlugin(UPDATE_URL);
 	}
 }
 
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
 	name = "GFL-ServerAds",
-	description = "GFL's Server Adverts plugin.",
-	author = "Roy (Christian Deacon)",
+	author = "Christian Deacon (Roy)",
+	description = "GFL's Server Advertisements plugin.",
 	version = PL_VERSION,
 	url = "GFLClan.com & TheDevelopingCommunity.com"
 };
 
-public OnPluginStart() 
+public void OnPluginStart() 
 {
+	g_bCVarsLoaded = false;
+	
 	Forwards();
 	ForwardConVars();
 	ForwardCommands();
+	
+	// Load Translations.
+	LoadTranslations("GFL-ServerAds.phrases.txt");
+	
+	/* Clear the Server Ads array just in case. */
+	ClearServerAdsArray();
 }
 
-stock Forwards() 
+stock void Forwards() 
 {
 	g_hOnDefaultAd = CreateGlobalForward("GFLSA_OnDefaultAd", ET_Event);
 	g_hOnPaidAd = CreateGlobalForward("GFLSA_OnPaidAd", ET_Event);
-	g_hOnErrorCountReached = CreateGlobalForward("GFLSA_OnErrorCountReached", ET_Event);
-	
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Forwards() :: Executed.");
-		#endif
 }
 
-stock ForwardConVars() 
-{
-	CreateConVar("GFLServerAds_version", PL_VERSION, "GFL's Server Ads version.");
-	
+stock void ForwardConVars() 
+{	
 	g_hAdInterval = CreateConVar("sm_gflsa_ad_interval", "30.00", "Time in-between advertisements.");
 	HookConVarChange(g_hAdInterval, CVarChanged);
 	
 	g_hCustomAdsFile = CreateConVar("sm_gflsa_custom_ads_file", "customads.txt", "The file name that displays custom server ads in the sourcemod/configs directory.");
 	HookConVarChange(g_hCustomAdsFile, CVarChanged);	
 	
-	g_hEnableErrorReachLimit = CreateConVar("sm_gflsa_enable_error_reach_limit", "1", "If 1, will retry the database if the MySQL error count is reached.");
-	HookConVarChange(g_hEnableErrorReachLimit, CVarChanged);	
-	
 	g_hGlobalTableName = CreateConVar("sm_gflsa_global_tablename", "gfl_adverts-default", "The table name of the global advertisements.");
 	HookConVarChange(g_hGlobalTableName, CVarChanged);	
 	
 	g_hPaidTableName = CreateConVar("sm_gflsa_paid_tablename", "gfl_adverts-paid", "The table name of the paid advertisements.");
-	HookConVarChange(g_hPaidTableName, CVarChanged);
+	HookConVarChange(g_hPaidTableName, CVarChanged);		
+	
+	g_hGameID = CreateConVar("sm_gflsa_game_id", "4", "The server's Game ID. Find this on the GitLab page or contact Roy.");
+	HookConVarChange(g_hGameID, CVarChanged);	
+	
+	g_hDBPriority = CreateConVar("sm_gflsa_db_priority", "1", "The priority of queries for the plugin.");
+	HookConVarChange(g_hDBPriority, CVarChanged);
+	
+	g_hAdvanceDebug = CreateConVar("sm_gflsa_advancedebug", "0", "Enable advanced debugging for this plugin?");
+	HookConVarChange(g_hAdvanceDebug, CVarChanged);
+	
+	g_hCreateDBTable = CreateConVar("sm_gflsa_db_createtable", "0", "Attempt to create the tables needed for this plugin if they doesn't exist.");
+	HookConVarChange(g_hCreateDBTable, CVarChanged);
 	
 	AutoExecConfig(true, "GFL-ServerAds");
 }
 
-public CVarChanged(Handle:hCVar, const String:OldV[], const String:NewV[]) 
+public void CVarChanged(Handle hCVar, const char[] OldV, const char[] NewV) 
 {
 	ForwardValues();
+	
+	if (hCVar == g_hAdInterval) 
+	{
+		if (g_hAdvertTimer != null)
+		{
+			delete g_hAdvertTimer;
+		}
+		
+		g_hAdvertTimer = CreateTimer(g_fAdInterval, DisplayAdvert, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+	}
 }
 
-stock ForwardCommands() 
+stock void ForwardCommands() 
 {
 	RegAdminCmd("sm_sa_update", Command_UpdateAds, ADMFLAG_ROOT);
 	RegAdminCmd("sm_sa_printarray", Command_PrintArray, ADMFLAG_SLAY);
+	RegAdminCmd("sm_sa_printads", Command_PrintAds, ADMFLAG_SLAY);
 }
 
-public OnConfigsExecuted() 
+public void OnConfigsExecuted() 
 {
 	ForwardValues();
 }
 
-stock ForwardValues() 
+stock void ForwardValues() 
 {
 	g_fAdInterval = GetConVarFloat(g_hAdInterval);
 	GetConVarString(g_hCustomAdsFile, g_sCustomAdsFile, sizeof(g_sCustomAdsFile));
-	g_bEnableErrorReachLimit = GetConVarBool(g_hEnableErrorReachLimit);
 	GetConVarString(g_hGlobalTableName, g_sGlobalTableName, sizeof(g_sGlobalTableName));
 	GetConVarString(g_hPaidTableName, g_sPaidTableName, sizeof(g_sPaidTableName));
+	g_iGameID = GetConVarInt(g_hGameID);
+	g_iDBPriority = GetConVarInt(g_hDBPriority);
+	g_bAdvanceDebug = GetConVarBool(g_hAdvanceDebug);
+	g_bCreateDBTable = GetConVarBool(g_hCreateDBTable);
+	
+	g_bCVarsLoaded = true;
+	
+	if (g_iDBPriority == 0)
+	{
+		// High.
+		dbPriority = DBPrio_High;
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] ForwardValues() :: DataBase priority set to high.");
+		}
+	}
+	else if (g_iDBPriority == 1)
+	{
+		// Normal.
+		dbPriority = DBPrio_Normal;
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] ForwardValues() :: DataBase priority set to normal.");
+		}
+	}
+	else if (g_iDBPriority == 2)
+	{
+		// Low.
+		dbPriority = DBPrio_Low;
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] ForwardValues() :: DataBase priority set to low.");
+		}
+	}
+	else
+	{
+		// Normal.
+		dbPriority = DBPrio_Normal;
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] ForwardValues() :: DataBase priority set to normal. (value not valid)");
+		}
+	}
 }
 
-public GFLMySQL_OnDatabaseConnected(Handle:hDB)
+public int GFLMySQL_OnDatabaseConnected(Handle hDB)
 {
-	if (hDB != INVALID_HANDLE)
+	if (g_bAdvanceDebug)
 	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] GFLMySQL_OnDatabaseConnected() :: Reached.");
-		#endif
+		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] GFLMySQL_OnDatabaseConnected() :: Executed...");
+	}
+	
+	// Set g_bEnabled to false just in case.
+	g_bEnabled = false;
+	
+	if (hDB != null && g_bCVarsLoaded)
+	{
 		g_hDB = hDB;
 		g_bEnabled = true;
 		
-		UpdateAdverts();
-	}
-	#if defined DEVELOPDEBUG then
-		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] GFLMySQL_OnDatabaseConnected() :: Finished.");
-	#endif
-		
-	CreateTimer(g_fAdInterval, DisplayAdvert, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
-}
-
-public GFLCore_OnLoad()
-{
-	#if defined DEVELOPDEBUG then
-		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] GFLCore_OnLoad() :: Loaded.");
-	#endif
-	
-	g_bCoreEnabled = true;
-}
-
-public GFLCore_OnUnload()
-{
-	#if defined DEVELOPDEBUG then
-		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] GFLCore_OnUnload() :: Loaded.");
-	#endif
-	
-	g_bCoreEnabled = false;
-}
-
-public UpdateAdverts()
-{
-	#if defined DEVELOPDEBUG then
-		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] UpdateAdverts() :: Reached.");
-	#endif
-	if (!g_bEnabled || !g_bCoreEnabled)
-	{
-		if (!g_bEnabled)
+		if (g_bCreateDBTable)
 		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] UpdateAdverts() :: Ended early. g_bEnabled = false.");
-			#endif
+			CreateSQLTables();
 		}
 		
-		if (g_bCoreEnabled)
+		UpdateAdverts();
+		
+		if (g_hAdvertTimer != null)
 		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] UpdateAdverts() :: Ended early. g_bCoreEnabled = false.");
-			#endif
+			delete g_hAdvertTimer;
+		}
+		
+		g_hAdvertTimer = CreateTimer(g_fAdInterval, DisplayAdvert, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+	}
+	else
+	{
+		g_bEnabled = false;
+		
+		// Create a retry timer.
+		CreateTimer(30.0, Timer_Reconnect, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+	}
+}
+
+public int GFLMySQL_OnDatabaseDown()
+{
+	GFLCore_LogMessage("", "[GFL-ServerAds] GFLMySQL_OnDatabaseDown() :: Executed...");
+	g_bEnabled = false;
+	
+	if (g_hAdvertTimer != null)
+	{
+		delete g_hAdvertTimer;
+	}
+
+	/* Clear the Server Ads array just in case. */
+	ClearServerAdsArray();
+	
+	// Create a retry timer.
+	CreateTimer(30.0, Timer_Reconnect, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+}
+
+public Action Timer_Reconnect(Handle hTimer)
+{
+	// Let's try to grab the database.
+	Handle hDB = GFLMySQL_GetDatabase();
+	
+	// Check if database is valid.
+	if (hDB != null)
+	{
+		// Attempt to reconnect.
+		GFLMySQL_OnDatabaseConnected(hDB);
+		
+		return Plugin_Stop;
+	}
+	
+	return Plugin_Continue;
+}
+
+public void UpdateAdverts()
+{
+	if (g_bAdvanceDebug)
+	{
+		GFLCore_LogMessage("", "[GFL-ServerAds] UpdateAdverts() :: Executed.");
+	}
+
+	if (!g_bEnabled)
+	{
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("", "[GFL-ServerAds] UpdateAdverts() :: Database down. Aborting...");
 		}
 		
 		return;
 	}
 	
-	if (g_hDB == INVALID_HANDLE)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] UpdateAdverts() :: Ended early. g_hDB = INVALID_HANDLE.");
-		#endif
-		
-		GFLCore_LogMessage("", "[GFL-ServerAds] UpdateAdverts() :: Error: Database handle is invalid. Plugin Disabled.");
-		g_bEnabled = false;
+	if (g_hDB == null)
+	{		
+		GFLCore_LogMessage("", "[GFL-ServerAds] UpdateAdverts() :: Error: Database handle is invalid.");
 		return;
 	}
 	
@@ -233,28 +316,31 @@ public UpdateAdverts()
 	ClearServerAdsArray();
 	g_iAdCount = 0;
 	
-	// Default Advertisements.
-	decl String:sQuery[256];
-	Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s`", g_sGlobalTableName);
-	SQL_TQuery(g_hDB, AdvertsDefaultCallback, sQuery, _, DBPrio_High);
+	// Global Advertisements.
+	char sQuery[256];
+	Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s` WHERE `gameid`=0", g_sGlobalTableName);
+	SQL_TQuery(g_hDB, AdvertsDefaultCallback, sQuery, _, dbPriority);
 	
 	// Paid Advertisements.
-	decl String:sQuery2[256];
+	char sQuery2[256];
 	Format(sQuery2, sizeof(sQuery2), "SELECT * FROM `%s` WHERE `activated`=1", g_sPaidTableName);
-	SQL_TQuery(g_hDB, AdvertsPaidCallback, sQuery2, _, DBPrio_High);
+	SQL_TQuery(g_hDB, AdvertsPaidCallback, sQuery2, _, dbPriority);
+	
+	// Global Game Advertisements.
+	char sQuery3[256];
+	Format(sQuery3, sizeof(sQuery3), "SELECT * FROM `%s` WHERE `gameid`=%d", g_sGlobalTableName, g_iGameID);
+	SQL_TQuery(g_hDB, AdvertsDefaultCallback, sQuery3, _, dbPriority);
 	
 	// Custom Advertisements
-	decl String:sPath[PLATFORM_MAX_PATH];
+	char sPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, sPath, sizeof(sPath), "configs/%s", g_sCustomAdsFile);
-	new Handle:hKV = CreateKeyValues("CustomAdverts");
+	Handle hKV = CreateKeyValues("CustomAdverts");
 	FileToKeyValues(hKV, sPath);
 	
 	if (KvGotoFirstSubKey(hKV))
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] UpdateAdverts()->CustomAdverts() :: GotoFirstSubKey = true.");
-		#endif
-		decl String:sSectionName[11];
+	{	
+		char sSectionName[11];
+		
 		do 
 		{
 			KvGetSectionName(hKV, sSectionName, sizeof(sSectionName));
@@ -271,43 +357,10 @@ public UpdateAdverts()
 	
 }
 
-public AdvertsDefaultCallback(Handle:hOwner, Handle:hHndl, const String:sErr[], any:data)
+public void AdvertsDefaultCallback(Handle hOwner, Handle hHndl, const char[] sErr, any data)
 {	
-	if (hOwner == INVALID_HANDLE)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsDefaultCallback() :: hOwner = INVALID_HANDLE.");
-		#endif
-		if (g_bEnableErrorReachLimit) 
-		{
-			g_iSQLErrorCount++;
-			if (g_iSQLErrorCount > 5)
-			{
-				g_iSQLErrorCount = 0;
-				if (StrContains(sErr, "10061")) 
-				{
-					#if defined DEVELOPDEBUG then
-						GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsDefaultCallback() :: Error count reached.");
-					#endif
-					
-					Call_StartForward(g_hOnErrorCountReached);
-					Call_Finish();
-				}
-			}
-		}
-		
-		GFLCore_LogMessage("", "[GFL-ServerAds] Error on AdvertsDefault query. Error: %s (%i/5)", sErr, g_iSQLErrorCount);
-		g_bEnabled = false;
-	}
-	
-	if (hHndl != INVALID_HANDLE)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsDefaultCallback():: hHndl != INVALID_HANDLE.");
-		#endif
-		
-		g_iSQLErrorCount = 0;
-		
+	if (hHndl != null)
+	{	
 		while (SQL_FetchRow(hHndl))
 		{
 			g_arrServerAds[g_iAdCount][iID] = SQL_FetchInt(hHndl, 0);
@@ -316,53 +369,20 @@ public AdvertsDefaultCallback(Handle:hOwner, Handle:hHndl, const String:sErr[], 
 			g_arrServerAds[g_iAdCount][iServerID] = SQL_FetchInt(hHndl, 3);
 			g_arrServerAds[g_iAdCount][iChatType] = SQL_FetchInt(hHndl, 4);
 			
+			if (g_bAdvanceDebug)
+			{
+				GFLCore_LogMessage("", "[GFL-ServerAds] AdvertsDefaultCallback() :: Added advertisement (ID: %i, Game ID: %i, Msg: \"%s\")", g_arrServerAds[g_iAdCount][iID], g_arrServerAds[g_iAdCount][iGameID], g_arrServerAds[g_iAdCount][sMsg]);
+			}
+			
 			g_iAdCount++;
 		}
 	}
-	else
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsDefaultCallback() :: hHndl = INVALID_HANDLE. Error: (%s).", sErr);
-		#endif
-	}
 }
 
-public AdvertsPaidCallback(Handle:hOwner, Handle:hHndl, const String:sErr[], any:data)
-{
-	if (hOwner == INVALID_HANDLE)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsPaidCallback() :: hOwner = INVALID_HANDLE;");
-		#endif
-		if (g_bEnableErrorReachLimit) 
-		{
-			g_iSQLErrorCount++;
-			if (g_iSQLErrorCount > 5)
-			{
-				g_iSQLErrorCount = 0;
-				if (StrContains(sErr, "10061")) 
-				{
-					#if defined DEVELOPDEBUG then
-						GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsPaidCallback() :: Error Count reached.");
-					#endif
-					Call_StartForward(g_hOnErrorCountReached);
-					Call_Finish();
-				}
-			}
-		}
-		
-		GFLCore_LogMessage("", "[GFL-ServerAds] AdvertsPaid() :: Error: %s (%i/5)", sErr, g_iSQLErrorCount);
-		g_bEnabled = false;
-	}
-	
-	if (hHndl != INVALID_HANDLE)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsPaidCallback() :: hHndl != INVALID_HANDLE.");
-		#endif
-		
-		g_iSQLErrorCount = 0;
-		
+public void AdvertsPaidCallback(Handle hOwner, Handle hHndl, const char[] sErr, any data)
+{	
+	if (hHndl != null)
+	{	
 		while (SQL_FetchRow(hHndl))
 		{
 			g_arrServerAds[g_iAdCount][iID] = SQL_FetchInt(hHndl, 0);
@@ -372,50 +392,48 @@ public AdvertsPaidCallback(Handle:hOwner, Handle:hHndl, const String:sErr[], any
 			
 			g_arrServerAds[g_iAdCount][iPaid] = 1;
 			
+			if (g_bAdvanceDebug)
+			{
+				GFLCore_LogMessage("", "[GFL-ServerAds] AdvertsPaidCallback() :: Added advertisement (ID: %i, Msg: \"%s\")", g_arrServerAds[g_iAdCount][iID], g_arrServerAds[g_iAdCount][sMsg]);
+			}
+			
 			g_iAdCount++;
 		}
 	}
-	else
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] AdvertsPaidCallback() :: hHndl = INVALID_HANDLE. Error: (%s).", sErr);
-		#endif
-	}
 }
 
-public Action:DisplayAdvert(Handle:hTimer)
+public Action DisplayAdvert(Handle hTimer)
 {
-	if (!g_bEnabled || !g_bCoreEnabled)
+	if (g_bAdvanceDebug)
 	{
-		if (!g_bEnabled)
+		GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: Executed.");
+	}
+	
+	if (!g_bEnabled)
+	{
+		if (g_bAdvanceDebug)
 		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: Ended early. g_bEnabled = false.");
-			#endif
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: Plugin Disabled.");
 		}
 		
-		if (g_bCoreEnabled)
-		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: Ended early. g_bCoreEnabled = false.");
-			#endif
-		}
-		
-		return;
+		return Plugin_Stop;
 	}
 	
 	// Display the correct advert!
 	if (!StrEqual(g_arrServerAds[g_iCurAd][sMsg], ""))
 	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: sMsg != \"\"");
-		#endif
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: Displaying Ad #%i", g_iCurAd);
+		}
 		
-		decl String:sFormattedMsg[1024];
+		char sFormattedMsg[1024];
+		
 		if (g_arrServerAds[g_iCurAd][iPaid] == 1)
 		{
-			Format(sFormattedMsg, sizeof(sFormattedMsg), "> {darkred}[AD]{default}%s", g_arrServerAds[g_iCurAd][sMsg]);
-			for (new iClient = 1; iClient <= MaxClients; iClient++)
+			Format(sFormattedMsg, sizeof(sFormattedMsg), "%t%t", "ChatPrefix", "PaidAd", g_arrServerAds[g_iCurAd][sMsg]);
+			
+			for (int iClient = 1; iClient <= MaxClients; iClient++)
 			{
 				if (!IsClientInGame(iClient) || !GFLCore_ClientAds(iClient))
 				{
@@ -442,8 +460,9 @@ public Action:DisplayAdvert(Handle:hTimer)
 		}
 		else
 		{
-			Format(sFormattedMsg, sizeof(sFormattedMsg), "> %s", g_arrServerAds[g_iCurAd][sMsg]);
-			for (new iClient = 1; iClient <= MaxClients; iClient++)
+			Format(sFormattedMsg, sizeof(sFormattedMsg), "%t%s", "ChatPrefix", g_arrServerAds[g_iCurAd][sMsg]);
+			
+			for (int iClient = 1; iClient <= MaxClients; iClient++)
 			{
 				if (!IsClientInGame(iClient) || !GFLCore_ClientAds(iClient))
 				{
@@ -473,66 +492,79 @@ public Action:DisplayAdvert(Handle:hTimer)
 	g_iCurAd++;
 	
 	if (g_iCurAd >= g_iAdCount)
-	{
-		#if defined DEVELOPDEBUG then
-			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] DisplayAdvert() :: g_iCurAd >= g_iAdCount -> true.");
-		#endif
+	{		
 		g_iCurAd = 0;
+	}
+	
+	return Plugin_Continue;
+}
+
+public void OnMapEnd()
+{
+	if (g_hAdvertTimer != null)
+	{
+		delete g_hAdvertTimer;
 	}
 }
 
-public Action:Command_UpdateAds(iClient, iArgs)
+public Action Command_UpdateAds(int iClient, int iArgs)
 {
-	if (!g_bEnabled || !g_bCoreEnabled)
+	if (!g_bEnabled)
 	{
-		if (!g_bEnabled)
-		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Command_UpdateAds() :: Ended early. g_bEnabled = false.");
-			#endif
-		}
+		CReplyToCommand(iClient, "%t%t", "Tag", "PluginDisabled");
 		
-		if (!g_bCoreEnabled)
-		{
-			#if defined DEVELOPDEBUG then
-				GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Command_UpdateAds() :: Ended early. g_bCoreEnabled = false.");
-			#endif
-		}
-		
-		if (iClient == 0) 
-		{
-			PrintToServer("[GFL-ServerAds] Plugin disabled.");
-		} 
-		else 
-		{
-			PrintToChat(iClient, "\x03[GFL-ServerAds] \x02Plugin Disabled");
-		}	
 		return Plugin_Handled;
 	}
 	
 	UpdateAdverts();
-	if (iClient > 0)
-	{
-		PrintToChat(iClient, "\x03[GFL-ServerAds]\x02Server Advertisements updated!");
-	}
-	else
-	{
-		PrintToServer("\x03[GFL-ServerAds]\x02Server Advertisements updated!");
-	}
+	
+	CReplyToCommand(iClient, "%t%t", "Tag", "ServerAdsUpdated");
 	
 	return Plugin_Handled;
 }
 
-public Action:Command_PrintArray(iClient, iArgs)
+public Action Command_PrintArray(int iClient, int iArgs)
 {	
 	PrintServerAdsArray();
 	
 	return Plugin_Handled;
 }
 
-stock ClearServerAdsArray()
+public Action Command_PrintAds(int iClient, int iArgs)
 {
-	for (new i = 0; i < MAXADS; i++)
+	for (int i = 0; i < g_iAdCount; i++)
+	{
+		// Check if the ad is valid.
+		if (StrEqual(g_arrServerAds[i][sMsg], ""))
+		{
+			continue;
+		}
+		
+		char sFormattedMsg[1024];
+		
+		// Check ad type.
+		if (g_arrServerAds[i][iPaid] == 1)
+		{
+			// Paid ad.
+			Format(sFormattedMsg, sizeof(sFormattedMsg), "[%i] %t%t", g_arrServerAds[i][iID], "ChatPrefix", "PaidAd", g_arrServerAds[i][sMsg]);
+			
+			CPrintToChat(iClient, sFormattedMsg);
+		}
+		else
+		{
+			// Default/Game ad.
+			Format(sFormattedMsg, sizeof(sFormattedMsg), "[%i] %t%s", g_arrServerAds[i][iID], "ChatPrefix", g_arrServerAds[i][sMsg]);
+			
+			CPrintToChat(iClient, sFormattedMsg);
+		}
+	}
+
+	return Plugin_Handled;
+}
+
+stock void ClearServerAdsArray()
+{
+	for (int i = 0; i < MAXADS; i++)
 	{
 		g_arrServerAds[i][iID] = -1;
 		strcopy(g_arrServerAds[i][sMsg], 1024, "");
@@ -545,21 +577,107 @@ stock ClearServerAdsArray()
 	}
 }
 
-stock PrintServerAdsArray()
+stock void PrintServerAdsArray()
 {
-	for (new i = 0; i < MAXADS; i++)
+	for (int i = 0; i < g_iAdCount; i++)
 	{
-		if (!StrEqual(g_arrServerAds[i][sMsg], ""))
+		if (StrEqual(g_arrServerAds[i][sMsg], ""))
 		{
-			PrintToServer("#%i:", i);
-			PrintToServer("---------------------------");
-			PrintToServer("Message: %s", g_arrServerAds[i][sMsg]);
-			PrintToServer("Chat Type: %i", g_arrServerAds[i][iChatType]);
-			PrintToServer("Game ID: %i", g_arrServerAds[i][iGameID]);
-			PrintToServer("Server ID: %i", g_arrServerAds[i][iServerID]);
-			PrintToServer("Paid: %i", g_arrServerAds[i][iPaid]);
-			PrintToServer("Custom: %i", g_arrServerAds[i][iCustom]);
-			PrintToServer("---------------------------");
+			continue;
+		}
+		
+		PrintToServer("#%i:", i);
+		PrintToServer("---------------------------");
+		PrintToServer("Message: %s", g_arrServerAds[i][sMsg]);
+		PrintToServer("Chat Type: %i", g_arrServerAds[i][iChatType]);
+		PrintToServer("Game ID: %i", g_arrServerAds[i][iGameID]);
+		PrintToServer("Server ID: %i", g_arrServerAds[i][iServerID]);
+		PrintToServer("Paid: %i", g_arrServerAds[i][iPaid]);
+		PrintToServer("Custom: %i", g_arrServerAds[i][iCustom]);
+		PrintToServer("---------------------------");
+	}
+}
+
+stock void CreateSQLTables()
+{
+	// We need to make sure they aren't already created.
+	char sQuery[64];
+	
+	Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s`", g_sGlobalTableName);
+	SQL_TQuery(g_hDB, Callback_GlobalTableCheck, sQuery, _, dbPriority);
+
+	Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s`", g_sPaidTableName);
+	SQL_TQuery(g_hDB, Callback_PaidTableCheck, sQuery, _, dbPriority);
+}
+
+// Global Table.
+public void Callback_GlobalTableCheck(Handle hOwner, Handle hHndl, const char[] sErr, any Data)
+{
+	if (hHndl == null)
+	{
+		// Create the tables.
+		char sQuery[2048];
+		Format(sQuery, sizeof(sQuery), "CREATE TABLE IF NOT EXISTS `%s` (`id` int(11) NOT NULL AUTO_INCREMENT,`message` varchar(1024) NOT NULL,`gameid` int(11) NOT NULL,`serverid` int(11) NOT NULL,`chattype` int(11) NOT NULL, PRIMARY KEY (`id`)) ENGINE=MyISAM  DEFAULT CHARSET=latin1;", g_sGlobalTableName);
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_GlobalTableCheck() :: Create Table Query: %s", sQuery);
+		}
+		
+		SQL_TQuery(g_hDB, Callback_CreateGlobalTable, sQuery, _, dbPriority);
+	}
+}
+
+public void Callback_CreateGlobalTable(Handle hOwner, Handle hHndl, const char[] sErr, any Data)
+{
+	if (hHndl == null)
+	{
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_CreateGlobalTable() :: Error creating the `%s` table. Error: %s", g_sGlobalTableName, sErr);
+		}
+	}
+	else
+	{
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_CreateGlobalTable() :: `%s` table created successfully!", g_sGlobalTableName);
+		}
+	}
+}
+
+// Paid Table.
+public void Callback_PaidTableCheck(Handle hOwner, Handle hHndl, const char[] sErr, any Data)
+{
+	if (hHndl == null)
+	{
+		// Create the tables.
+		char sQuery[2048];
+		Format(sQuery, sizeof(sQuery), "CREATE TABLE IF NOT EXISTS `gfl_adverts-paid` (`id` int(11) NOT NULL AUTO_INCREMENT,`pid` int(11) NOT NULL,`uid` int(11) NOT NULL,`activated` int(1) NOT NULL,`message` varchar(1024) NOT NULL,`chattype` int(11) NOT NULL,PRIMARY KEY (`id`)) ENGINE=MyISAM  DEFAULT CHARSET=latin1;", g_sPaidTableName);
+		
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_PaidTableCheck() :: Create Table Query: %s", sQuery);
+		}
+		
+		SQL_TQuery(g_hDB, Callback_CreatePaidTable, sQuery, _, dbPriority);
+	}
+}
+
+public void Callback_CreatePaidTable(Handle hOwner, Handle hHndl, const char[] sErr, any Data)
+{
+	if (hHndl == null)
+	{
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_CreatePaidTable() :: Error creating the `%s` table. Error: %s", g_sPaidTableName, sErr);
+		}
+	}
+	else
+	{
+		if (g_bAdvanceDebug)
+		{
+			GFLCore_LogMessage("serverads-debug.log", "[GFL-ServerAds] Callback_CreatePaidTable() :: `%s` table created successfully!", g_sPaidTableName);
 		}
 	}
 }

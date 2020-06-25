@@ -8,16 +8,15 @@
 forward GFLSH_OnAdvert();
 
 /*
-	* Called when the ServerHop list is retrieved/updated.
+	* Called when the ServerHop server list is retrieved/updated.
 	*
 	*@return		Nothing.
 */
 forward GFLSH_OnServersUpdated();
 
 /*
-	* Called when the SQL Error count is reached.
+	* Called when the ServerHop game list is retrieved/updated.
 	*
 	*@return		Nothing.
 */
-forward GFLSH_OnErrorCountReached();
-
+forward GFLSH_OnGamesUpdated();

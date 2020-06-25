@@ -1,0 +1,11 @@
+1.4:
+- Set query priority to normal instead of high.
+
+1.5b:
+- Converted to the new SourceMod syntax.
+- Added query priority ConVars (if you want to, you can set the queries to low, normal, or high using a ConVar).
+- Added Global Game Advertisements support.
+- Added the "sm_sh_addserver" command for Server Owners. If your server isn't already on the server list, use this command to add it! Type sm_sh_addserver in the console to see the arguments required.
+- Added a public PHP script other community owners can use to update the servers in the database.
+- Added public SQL tables for other community servers with good documentation (the plugin attempts to create tables if they don't exist).
+- Added translation files. Server Owners can edit these in the sourcemod/translations/ folder (e.g. sourcemod/translations/GFL-ServerHop.phrases.txt).
