@@ -1,0 +1,19 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"UserManagementTag"
+	{
+		"ru"		"{red}[GFL]"
+	}
+	
+	"PerksLoaded"
+	{
+		"#format"	"{1:s}"
+		"ru"		"{default}Ваши {lightgreen}{1} {default}перков были загружены!"
+	}
+	
+	"ReloadUsersReply"
+	{
+		"ru"		"{lightgreen} Перезагрузка {default} всех пользователей."
+	}
+}
