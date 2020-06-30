@@ -1,0 +1,26 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"ru"	"{red}[GFL-Core]"
+	}
+	
+	// When somebody attempts to disable advertisements but doesn't have permission to.
+	"AdsDenyMessage"
+	{
+		"ru"	"{default}Вы можете отключить объявления только как {lightgreen}Supporter+{default}. Пожертвуйте на @ {lightgreen}GFLClan.com{default}!"
+	}
+	
+	// When somebody successfully enables advertisements again.
+	"AdsEnabled"
+	{
+		"ru"	"{default}Серверные объявления включены!"
+	}	
+	
+	// When somebody successfully disables advertisements.
+	"AdsDisabled"
+	{
+		"ru"	"{default}Серверные объявления отключены!"
+	}
+}

@@ -1,0 +1,32 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"ru"	"{darkred}[GFL-MySQL]"
+	}
+	
+	// When the plugin is disabled.
+	"PluginDisabled"
+	{
+		"ru"	"{default}Плагин отключен. Пожалуйста, попробуйте позже."
+	}
+	
+	// Checking database reply.
+	"CheckingDatabase"
+	{
+		"ru"	"{default}Проверка базы данных сейчас..."
+	}	
+	
+	// Check (connection): Okay
+	"CheckOkay"
+	{
+		"ru"	"{default}Подключение в порядке..."
+	}	
+	
+	// Checking database reply.
+	"CheckFailed"
+	{
+		"ru"	"{default}Ошибка подключения..."
+	}
+}
