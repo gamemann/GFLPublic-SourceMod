@@ -1,0 +1,14 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"ru"	"{darkred}[RLogger]"
+	}
+	
+	// Plugin disabled.
+	"PluginDisabled"
+	{
+		"ru"	"{default}Плагин отключен. Пожалуйста, попробуйте позже."
+	}
+}

@@ -1,0 +1,163 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"ru"	"{lightgreen}[Hop]"
+	}
+	
+	// Plugin disabled.
+	"PluginDisabled"
+	{
+		"ru"	"{default}Плагин отключен. Пожалуйста, попробуйте позже."
+	}
+	
+	// When the Reset Command is successful.
+	"ResetSuccess"
+	{
+		"ru"	"{default}Команда запущена. Дескриптор базы данных действителен! Обновление серверов сейчас!"
+	}	
+	
+	// When the Reset Command failed.
+	"ResetFailed"
+	{
+		"ru"	"{default}Команда запущена. Дескриптор базы данных {lightgreen}недействителен{default}."
+	}	
+	
+	// When the Refresh Command is successful.
+	"RefreshSuccess"
+	{
+		"ru"	"{default}Команда запущена. Обновление серверов сейчас!"
+	}	
+	
+	// When the Reset Command failed.
+	"RefreshFailed"
+	{
+		"ru"	"{default}Команда запущена. Дескриптор базы данных {lightgreen}недействителен{default}."
+	}
+	
+	// When somebody runs "sm_sh_addserver" but doesn't have the minimum arguments.
+	"AddServerLow"
+	{
+		"ru"	"{lightred}sm_sh_addserver {lightgreen}<name> <description> <publicip> <gameid> <locationid>"
+	}
+	
+	// When Adding a server is sucessful.
+	"AddServerSuccess"
+	{
+		"ru"	"{default}Успешно {lightgreen}обновлён{default}/{lightgreen}добавлен {default}сервер в базу данных."
+	}
+	
+	// The Server Hop Message Prefix.
+	"ServerHopAdPrefix"
+	{
+		"ru"	""
+	}
+	
+	// The Server Hop Advertisement string.
+	"ServerHopAd"
+	{
+		// 1: Server Name (not hostname).
+		// 2: Player Count.
+		// 3: Maximum Player Count.
+		// 4: Server Public IP.
+		// 5: Server Port #1.
+		// 6: Server IP.
+		// 7: Server Port #2.
+		// 8: Server Map Name.
+		// 9: Game Abbreviation (if ConVar is enabled).
+		
+		"#format"	"{1:s},{2:d},{3:d},{4:s},{5:d},{6:s},{7:d},{8:s},{9:s}"
+		"ru"		"{red}{9}{lightgreen}{1} {default}- ({lightgreen}{2}{default}/{lightgreen}{3}{default}) IP: {lightgreen}{4}:{5} {default}({lightgreen}{6}:{7}{default}). Карта: {lightgreen}{8}"
+	}	
+	
+	// The Server Hop Game Advertisement string (for debugging only).
+	"ServerHopGameAd"
+	{
+		// 1: Game Name.
+		// 2: Special (0/1).
+		// 3: Abbreviation.
+		// 4: Code Name.
+		
+		"#format"	"{1:s},{2:d},{3:s},{4:s}"
+		"ru"		"{lightgreen}{1} {default}(Special: {lightgreen}{2}{default}, Аббр: {lightgreen}{3}{default}, Код: {lightgreen}{4}{default})"
+	}
+	
+	// Called when a Client opens the server menu but there are no servers to show.
+	"NoServers"
+	{
+		"ru"	"Нет доступных серверов."
+	}
+	
+	// The Server Hop Menu phrases.
+	
+	// Menu: Server Name.
+	"MenuName"
+	{
+		// 1: Server's name (not hostname).
+		
+		"#format"	"{1:s}"
+		"ru"		"Название: {1}"
+	}
+	
+	// Menu: Player Count
+	"MenuPlayers"
+	{
+		// 1: Current Player Count.
+		// 2: Maximum Player Count.
+		
+		"#format"	"{1:d},{2:d}"
+		"ru"		"Игроков: {1}/{2}"
+	}
+	
+	// Menu: Public IP.
+	"MenuPublicIP"
+	{
+		// 1: Server Public IP.
+		// 2: Server Port.
+		
+		"#format"	"{1:s},{2:d}"
+		"ru"		"Публичный IP: {1}:{2}"
+	}	
+	
+	// Menu: Real IP.
+	"MenuRealIP"
+	{
+		// 1: Server Real IP.
+		// 2: Server Port.
+		
+		"#format"	"{1:s},{2:d}"
+		"ru"		"Настоящий IP: {1}:{2}"
+	}	
+	
+	// Menu: Current Map
+	"MenuMap"
+	{
+		// 1: Server Current Map
+		
+		"#format"	"{1:s}"
+		"ru"		"Карта: {1}"
+	}	
+	
+	// Menu: New
+	"MenuNew"
+	{
+		"ru"		"Новое"
+	}
+	
+	// New Server Announce message.
+	"NewServerAnnounceMsg"
+	{
+		// 1: Server Name (not hostname).
+		// 2: Player Count.
+		// 3: Maximum Player Count.
+		// 4: Server Public IP.
+		// 5: Server Port #1.
+		// 6: Server IP.
+		// 7:  Server Port #2.
+		// 8:  Server Map Name
+		
+		"#format"	"{1:s},{2:d},{3:d},{4:s},{5:d},{6:s},{7:d},{8:s}"
+		"ru"		"{green}[НОВОЕ] {default}Проверьте наш {green}новый {lightgreen}{1} {default}сервер! IP: {lightgreen}{4}:{5} {default}({green}{6}:{7}{default})! Карта: {8}"
+	}
+}

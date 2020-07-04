@@ -1,0 +1,35 @@
+"Phrases"
+{
+	// The plugin's tag.
+	"Tag"
+	{
+		"ru"	"{lightgreen}[GFL-ServerAds]"
+	}
+	
+	// The chat prefix that goes at the beginning of every advertisement.
+	"ChatPrefix"
+	{
+		"ru"	"> "
+	}
+	
+	// Paid Advertisement.
+	"PaidAd"
+	{
+		// 1: Paid advertisment message.
+		
+		"#format"	"{1:s}"
+		"ru"		"{lightgreen}[ОБЪЯВЛЕНИЕ]{default}{1}"
+	}
+	
+	// Plugin disabled.
+	"PluginDisabled"
+	{
+		"ru"	"{default}Плагин отключен. Пожалуйста, попробуйте позже."
+	}
+	
+	// Server Advertisements updated message (used in a command reply).
+	"ServerAdsUpdated"
+	{
+		"ru"	"{default}Серверное объявление обновлено!"
+	}
+}
