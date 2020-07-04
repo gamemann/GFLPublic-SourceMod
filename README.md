@@ -1,3 +1,6 @@
+# Archived
+You can find the latest version of each plugin in GFL's organization [here](https://github.com/GFLClan).
+
 # To-Do-List
 * None.
 
